@@ -1,116 +1,104 @@
+import jetbrains.buildServer.configs.kotlin.v2019_2.*
+import jetbrains.buildServer.configs.kotlin.v2019_2.vcs.GitVcsRoot
+import jetbrains.buildServer.configs.kotlin.v2019_2.buildFeatures.perfmon
+import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.gradle
+import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.maven
+import jetbrains.buildServer.configs.kotlin.v2019_2.triggers.vcs
+import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.script
+
 /*
- * TeamCity DSL Settings File
- * 
- * This file defines the build configurations for the Maven Configuration TeamCity Samples project.
- * 
- * NOTE: This file will show errors in the editor due to missing TeamCity DSL libraries,
- * but it will be processed correctly when imported into TeamCity.
- * 
- * The file defines:
- * 1. A Maven build configuration that builds the project
- * 2. A second, equal build configuration that depends on the first one
- * 3. Artifact publishing for both configurations
- */
+* TeamCity Kotlin DSL for Maven Configuration TeamCity Samples
+* This DSL defines two equal build configurations with a snapshot dependency
+*/
 
-// Import statements for TeamCity DSL
-import jetbrains.buildServer.configs.kotlin.v2023_05.*
-import jetbrains.buildServer.configs.kotlin.v2023_05.buildFeatures.perfmon
-import jetbrains.buildServer.configs.kotlin.v2023_05.buildSteps.maven
-import jetbrains.buildServer.configs.kotlin.v2023_05.triggers.vcs
-import jetbrains.buildServer.configs.kotlin.v2023_05.dependencies.snapshot
-
-// Version of the TeamCity DSL
 version = "2023.05"
 
-// Project definition
 project {
     // Project description
     description = "Maven Configuration TeamCity Samples"
-
-    // First build configuration
-    val mavenBuild = BuildType {
-        id("MavenBuild")
-        name = "Maven Build"
-        description = "Builds the project using Maven"
-
-        // VCS settings
-        vcs {
-            root(DslContext.settingsRoot)
-        }
-
-        // Build steps
-        steps {
-            maven {
-                goals = "clean test"
-                runnerArgs = "-Dmaven.test.failure.ignore=true"
-                userSettingsSelection = "default"
-                jdkHome = "%env.JDK_11_0%"
-            }
-        }
-
-        // Triggers
-        triggers {
-            vcs {}
-        }
-
-        // Features
-        features {
-            perfmon {}
-        }
-
-        // Artifacts
-        artifactRules = """
-            ch-simple/simple/target/*.jar => artifacts
-            ch-simple/simple/target/surefire-reports => reports
-        """.trimIndent()
+    
+    // Define VCS Root
+    val vcsRoot = GitVcsRoot {
+        id("MavenConfigurationTeamCitySamples_VcsRoot")
+        name = "Maven Configuration TeamCity Samples VCS Root"
+        url = "https://github.com/JetBrains/Maven-Configuration-TeamCity-Samples.git"
+        branch = "refs/heads/master"
     }
-
-    // Second build configuration that depends on the first one
-    val mavenBuildDependent = BuildType {
-        id("MavenBuildDependent")
-        name = "Maven Build Dependent"
-        description = "Second build configuration that depends on the first one"
-
-        // VCS settings
+    
+    vcsRoot(vcsRoot)
+    
+    // First build configuration
+    val buildConfig1 = BuildType {
+        id("MavenConfigurationTeamCitySamples_Build1")
+        name = "Build and Test (1)"
+        
         vcs {
-            root(DslContext.settingsRoot)
+            root(vcsRoot)
         }
-
-        // Build steps
+        
         steps {
             maven {
+                name = "Clean and Test"
                 goals = "clean test"
                 runnerArgs = "-Dmaven.test.failure.ignore=true"
-                userSettingsSelection = "default"
-                jdkHome = "%env.JDK_11_0%"
+                userSettingsSelection = "settings.xml"
+                localRepoScope = MavenBuildStep.RepositoryScope.MAVEN_DEFAULT
+                jdkHome = "%env.JDK_11%"
             }
         }
-
-        // Triggers
+        
         triggers {
-            vcs {}
+            vcs {
+                branchFilter = "+:*"
+            }
         }
-
-        // Features
+        
         features {
-            perfmon {}
+            perfmon {
+            }
         }
-
-        // Artifacts
-        artifactRules = """
-            ch-simple/simple/target/*.jar => artifacts
-            ch-simple/simple/target/surefire-reports => reports
-        """.trimIndent()
-
-        // Dependencies
+    }
+    
+    // Second build configuration (equal to the first one)
+    val buildConfig2 = BuildType {
+        id("MavenConfigurationTeamCitySamples_Build2")
+        name = "Build and Test (2)"
+        
+        vcs {
+            root(vcsRoot)
+        }
+        
+        steps {
+            maven {
+                name = "Clean and Test"
+                goals = "clean test"
+                runnerArgs = "-Dmaven.test.failure.ignore=true"
+                userSettingsSelection = "settings.xml"
+                localRepoScope = MavenBuildStep.RepositoryScope.MAVEN_DEFAULT
+                jdkHome = "%env.JDK_11%"
+            }
+        }
+        
+        triggers {
+            vcs {
+                branchFilter = "+:*"
+            }
+        }
+        
+        features {
+            perfmon {
+            }
+        }
+        
+        // Add snapshot dependency on the first build configuration
         dependencies {
-            snapshot(mavenBuild) {
+            snapshot(buildConfig1) {
                 onDependencyFailure = FailureAction.FAIL_TO_START
             }
         }
     }
-
-    // Register build configurations
-    buildType(mavenBuild)
-    buildType(mavenBuildDependent)
+    
+    // Register both build configurations
+    buildType(buildConfig1)
+    buildType(buildConfig2)
 }
