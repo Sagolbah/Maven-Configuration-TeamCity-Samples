@@ -1,60 +1,116 @@
-import jetbrains.buildServer.configs.kotlin.*
-import jetbrains.buildServer.configs.kotlin.buildFeatures.perfmon
-import jetbrains.buildServer.configs.kotlin.buildSteps.maven
-import jetbrains.buildServer.configs.kotlin.triggers.vcs
-
 /*
-The settings script is an entry point for defining a TeamCity
-project hierarchy. The script should contain a single call to the
-project() function with a Project instance or an init function as
-an argument.
+ * TeamCity DSL Settings File
+ * 
+ * This file defines the build configurations for the Maven Configuration TeamCity Samples project.
+ * 
+ * NOTE: This file will show errors in the editor due to missing TeamCity DSL libraries,
+ * but it will be processed correctly when imported into TeamCity.
+ * 
+ * The file defines:
+ * 1. A Maven build configuration that builds the project
+ * 2. A second, equal build configuration that depends on the first one
+ * 3. Artifact publishing for both configurations
+ */
 
-VcsRoots, BuildTypes, Templates, and subprojects can be
-registered inside the project using the vcsRoot(), buildType(),
-template(), and subProject() methods respectively.
+// Import statements for TeamCity DSL
+import jetbrains.buildServer.configs.kotlin.v2023_05.*
+import jetbrains.buildServer.configs.kotlin.v2023_05.buildFeatures.perfmon
+import jetbrains.buildServer.configs.kotlin.v2023_05.buildSteps.maven
+import jetbrains.buildServer.configs.kotlin.v2023_05.triggers.vcs
+import jetbrains.buildServer.configs.kotlin.v2023_05.dependencies.snapshot
 
-To debug settings scripts in command-line, run the
+// Version of the TeamCity DSL
+version = "2023.05"
 
-    mvnDebug org.jetbrains.teamcity:teamcity-configs-maven-plugin:generate
-
-command and attach your debugger to the port 8000.
-
-To debug in IntelliJ Idea, open the 'Maven Projects' tool window (View
--> Tool Windows -> Maven Projects), find the generate task node
-(Plugins -> teamcity-configs -> teamcity-configs:generate), the
-'Debug' option is available in the context menu for the task.
-*/
-
-version = "2024.07"
-
+// Project definition
 project {
+    // Project description
+    description = "Maven Configuration TeamCity Samples"
 
-    buildType(Build)
-}
+    // First build configuration
+    val mavenBuild = BuildType {
+        id("MavenBuild")
+        name = "Maven Build"
+        description = "Builds the project using Maven"
 
-object Build : BuildType({
-    name = "Build"
-
-    vcs {
-        root(DslContext.settingsRoot)
-    }
-
-    steps {
-        maven {
-            id = "Maven2"
-            goals = "clean test"
-            pomLocation = "ch-simple/pom.xml"
-            runnerArgs = "-Dmaven.test.failure.ignore=true"
-        }
-    }
-
-    triggers {
+        // VCS settings
         vcs {
+            root(DslContext.settingsRoot)
+        }
+
+        // Build steps
+        steps {
+            maven {
+                goals = "clean test"
+                runnerArgs = "-Dmaven.test.failure.ignore=true"
+                userSettingsSelection = "default"
+                jdkHome = "%env.JDK_11_0%"
+            }
+        }
+
+        // Triggers
+        triggers {
+            vcs {}
+        }
+
+        // Features
+        features {
+            perfmon {}
+        }
+
+        // Artifacts
+        artifactRules = """
+            ch-simple/simple/target/*.jar => artifacts
+            ch-simple/simple/target/surefire-reports => reports
+        """.trimIndent()
+    }
+
+    // Second build configuration that depends on the first one
+    val mavenBuildDependent = BuildType {
+        id("MavenBuildDependent")
+        name = "Maven Build Dependent"
+        description = "Second build configuration that depends on the first one"
+
+        // VCS settings
+        vcs {
+            root(DslContext.settingsRoot)
+        }
+
+        // Build steps
+        steps {
+            maven {
+                goals = "clean test"
+                runnerArgs = "-Dmaven.test.failure.ignore=true"
+                userSettingsSelection = "default"
+                jdkHome = "%env.JDK_11_0%"
+            }
+        }
+
+        // Triggers
+        triggers {
+            vcs {}
+        }
+
+        // Features
+        features {
+            perfmon {}
+        }
+
+        // Artifacts
+        artifactRules = """
+            ch-simple/simple/target/*.jar => artifacts
+            ch-simple/simple/target/surefire-reports => reports
+        """.trimIndent()
+
+        // Dependencies
+        dependencies {
+            snapshot(mavenBuild) {
+                onDependencyFailure = FailureAction.FAIL_TO_START
+            }
         }
     }
 
-    features {
-        perfmon {
-        }
-    }
-})
+    // Register build configurations
+    buildType(mavenBuild)
+    buildType(mavenBuildDependent)
+}
